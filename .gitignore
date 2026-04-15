@@ -1,0 +1,25 @@
+.DS_Store
+.git/
+
+# AI Agent directories (DO NOT upload these)
+.zencoder/
+.zenflow/
+.gemini/
+
+# Virtual environments
+venv/
+env/
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Depending on file size, you might want to exclude data and models
+# If your data is small, you can comment this out to upload it.
+# data/
+# models/
+
+# Keep the original nested repo out of this new standalone repository
+Gen-AI_Capstone/
+.qodo/

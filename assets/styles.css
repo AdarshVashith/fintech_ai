@@ -1,0 +1,286 @@
+/* =========================================================================
+   INTELLIGENT CREDIT RISK SCORING - PREMIUM UI SYSTEM
+   ========================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* --- 1. GLOBAL TYPOGRAPHY & RESET --- */
+html,
+body,
+[class*="css"] {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    color: #111827 !important;
+    /* Deep Stripe-like blue-gray */
+}
+
+/* Force markdown elements to be black to override dark mode defaults */
+.stMarkdown,
+.stMarkdown p,
+.stMarkdown span {
+    color: #111827 !important;
+}
+
+/* Base App Background */
+.stApp {
+    background-color: #f7f9fc;
+    /* Very faint, cool-toned off-white */
+    background-image:
+        radial-gradient(at 0% 0%, hsla(210, 100%, 97%, 1) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, hsla(220, 100%, 95%, 1) 0px, transparent 50%);
+    background-attachment: fixed;
+}
+
+/* --- 2. HEADER & BRANDING --- */
+/* Override h1 */
+h1 {
+    font-weight: 700 !important;
+    letter-spacing: -1.5px !important;
+    font-size: 2.8rem !important;
+    background: linear-gradient(135deg, #111827 0%, #374151 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem !important;
+    padding-top: 1rem !important;
+}
+
+/* Subtitle text below h1 */
+h1+div p {
+    font-size: 1.15rem !important;
+    color: #4b5563 !important;
+    font-weight: 400 !important;
+    letter-spacing: -0.2px;
+    margin-bottom: 2rem !important;
+}
+
+/* Section Headers (h3) */
+h3 {
+    font-weight: 600 !important;
+    color: #111827 !important;
+    font-size: 1.4rem !important;
+    letter-spacing: -0.5px !important;
+    margin-bottom: 1.5rem !important;
+    border-bottom: 2px solid #e5e7eb;
+    padding-bottom: 0.5rem;
+}
+
+/* Small Subheaders */
+.demographics-header {
+    color: #6b7280;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    margin-top: 12px;
+    display: block;
+    border-bottom: 1px solid #f3f4f6;
+    padding-bottom: 6px;
+}
+
+/* --- 3. CONTAINERS & FORMS (Glassmorphism & Shadows) --- */
+/* The main form container */
+[data-testid="stForm"] {
+    background-color: #ffffff !important;
+    border: 1px solid rgba(229, 231, 235, 0.8) !important;
+    border-radius: 16px !important;
+    padding: 32px 24px !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+[data-testid="stForm"]:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Regular Containers (Metrics/Results) */
+div[data-testid="stVerticalBlock"]>div>div[data-testid="stVerticalBlock"]>div[style*="border: 1px solid"] {
+    background-color: #ffffff !important;
+    border: 1px solid rgba(229, 231, 235, 0.8) !important;
+    border-radius: 16px !important;
+    padding: 24px !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* --- 4. INPUT WIDGETS --- */
+/* Number Inputs, Selectboxes, Text Inputs */
+div[data-baseweb="select"]>div {
+    background-color: #f9fafb !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 8px !important;
+    color: #1f2937 !important;
+    font-size: 0.95rem !important;
+    padding: 2px 8px !important;
+    /* Adding minimal padding to secure height */
+    transition: all 0.2s ease !important;
+}
+
+div[data-baseweb="select"] * {
+    color: #1f2937 !important;
+    /* Force all text inside the select to be dark */
+}
+
+div[data-baseweb="select"] div[data-testid="stMarkdownContainer"] {
+    color: #1f2937 !important;
+    /* Ensure the text inside the select is explicitly dark */
+}
+
+input[type="number"],
+input[type="text"] {
+    background-color: #f9fafb !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 8px !important;
+    color: #1f2937 !important;
+    font-size: 0.95rem !important;
+    padding: 8px 12px !important;
+    transition: all 0.2s ease !important;
+}
+
+/* Focus State for Inputs */
+div[data-baseweb="select"]>div:hover,
+div[data-baseweb="select"]>div:focus-within,
+input[type="number"]:focus,
+input[type="number"]:hover,
+input[type="text"]:focus,
+input[type="text"]:hover {
+    border-color: #3b82f6 !important;
+    background-color: #ffffff !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+    outline: none !important;
+}
+
+/* Form Layout Tightening - Override Streamlit spacing */
+[data-testid="stForm"] [data-testid="stVerticalBlock"] {
+    gap: 1rem !important;
+    /* Softened gap to prevent overlapping */
+}
+
+/* Clean up widget margins without breaking them */
+.stSelectbox,
+.stNumberInput,
+.stSlider {
+    margin-bottom: 0px !important;
+}
+
+/* Input Labels Tightening */
+label[data-testid="stWidgetLabel"] {
+    font-weight: 500 !important;
+    color: #4b5563 !important;
+    font-size: 0.85rem !important;
+    /* Slightly smaller labels */
+    margin-bottom: 2px !important;
+}
+
+/* Sliders */
+.stSlider div[data-baseweb="slider"] div[data-testid="stTickBar"] {
+    background-color: #e5e7eb !important;
+}
+
+.stSlider div[data-baseweb="slider"] div[role="slider"] {
+    background-color: #2563eb !important;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3) !important;
+}
+
+/* --- 5. BUTTONS --- */
+/* Primary Submit Button */
+button[kind="primaryFormSubmit"],
+button[kind="primary"] {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 14px 24px !important;
+    font-weight: 600 !important;
+    font-size: 1rem !important;
+    letter-spacing: 0.5px !important;
+    box-shadow: 0 4px 6px rgba(37, 99, 235, 0.25) !important;
+    transition: all 0.2s ease !important;
+    width: 100% !important;
+    margin-top: 1rem !important;
+    text-transform: uppercase !important;
+}
+
+button[kind="primaryFormSubmit"]:hover,
+button[kind="primary"]:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 12px rgba(37, 99, 235, 0.35) !important;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+}
+
+button[kind="primaryFormSubmit"]:active,
+button[kind="primary"]:active {
+    transform: translateY(0px) !important;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2) !important;
+}
+
+/* --- 6. ALERTS & STATUS MESSAGES --- */
+/* Success Banner (Low Risk) */
+[data-testid="stAlert"] {
+    border-radius: 12px !important;
+    padding: 20px !important;
+}
+
+div.stAlert:has(div[data-baseweb="notification"] > div[role="alert"] > div > svg[aria-label="check"]) {
+    background-color: #ecfdf5 !important;
+    border: 1px solid #10b981 !important;
+    color: #065f46 !important;
+}
+
+/* Error Banner (High Risk) */
+div.stAlert:has(div[data-baseweb="notification"] > div[role="alert"] > div > svg[aria-label="error"]) {
+    background-color: #fef2f2 !important;
+    border: 1px solid #ef4444 !important;
+    color: #991b1b !important;
+}
+
+/* Custom Alert Headings */
+[data-testid="stAlert"] h3 {
+    border-bottom: none !important;
+    margin-bottom: 0.5rem !important;
+    padding-bottom: 0 !important;
+    font-size: 1.25rem !important;
+}
+
+/* --- 7. DIVIDERS & HR --- */
+hr {
+    border: none !important;
+    height: 1px !important;
+    background-color: #f3f4f6 !important;
+    /* Lighter divider */
+    margin: 8px 0 16px 0 !important;
+    /* Tighter margins */
+}
+
+/* --- 8. EMPTY STATE PLACEHOLDER --- */
+.empty-state {
+    background-color: #ffffff;
+    border: 2px dashed #cbd5e1;
+    border-radius: 16px;
+    padding: 60px 40px;
+    text-align: center;
+    color: #64748b;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 400px;
+}
+
+.empty-state h4 {
+    color: #334155;
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.empty-state p {
+    font-size: 0.95rem;
+    max-width: 300px;
+    line-height: 1.5;
+}
+
+.empty-state-icon {
+    font-size: 3rem;
+    color: #94a3b8;
+    margin-bottom: 16px;
+}
