@@ -154,3 +154,4 @@ that still uses the ML score and policy retrieval outputs.
 
 The Credit Risk Prediction System successfully demonstrates how Machine Learning can automate loan risk assessment. The trained model achieved strong performance and can assist financial institutions in making reliable lending decisions.
 # Fintech_ai
+# fintech_ai
