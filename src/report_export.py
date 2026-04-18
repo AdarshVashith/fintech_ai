@@ -10,12 +10,21 @@ from reportlab.lib.units import inch
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 
+def _md_to_reportlab(text: str) -> str:
+    import re
+    # Convert **bold** to <b>bold</b>
+    text = re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", text)
+    # Convert leading bullet points to indented lines or bullet symbols
+    text = re.sub(r"^\s*[\-\*]\s+", r"• ", text, flags=re.MULTILINE)
+    return text.replace("\n", "<br/>")
+
+
 def _paragraphs_from_lines(lines: Iterable[str], style: ParagraphStyle) -> list[Any]:
     elements: list[Any] = []
     for line in lines:
         if not line:
             continue
-        elements.append(Paragraph(line.replace("\n", "<br/>"), style))
+        elements.append(Paragraph(_md_to_reportlab(line), style))
         elements.append(Spacer(1, 0.12 * inch))
     return elements
 

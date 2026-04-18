@@ -274,14 +274,14 @@ def run_agentic_lending_decision(
                     "You are a professional underwriting agent. Always call `predict_risk_score` first. "
                     "Then call `search_policy_docs` using the policy_query returned by the prediction tool "
                     "to ground your decision in actual lending standards. "
-                    "Return ONLY a JSON object with the following structure: "
-                    "{"
-                    "  'final_verdict': 'string (e.g. Approve, Decline, Conditional)', "
-                    "  'reasoning': 'string (technical breakdown of risk)', "
-                    "  'recommendations': 'string (bullet points of actionable steps)', "
-                    "  'references': 'string (specific policy citations found)', "
-                    "  'disclaimer': 'string (standard underwriting caveat)'"
-                    "}. Ground every claim in tool outputs.",
+                    "Return ONLY a clean JSON object with no markdown wrappers. "
+                    "\n\nFormat requirements for JSON fields:\n"
+                    "- `final_verdict`: High-level status.\n"
+                    "- `reasoning`: Technical breakdown in paragraphs.\n"
+                    "- `recommendations`: Actionable steps as a Markdown bulleted list.\n"
+                    "- `references`: A structured Markdown list of citations. For each source, use: **Source: [Filename] (Page X)** followed by bulleted clauses.\n"
+                    "- `disclaimer`: Standard underwriting caveat.\n\n"
+                    "Ensure your output is valid JSON and contains NO preamble or postscript.",
                 ),
                 (
                     "human",

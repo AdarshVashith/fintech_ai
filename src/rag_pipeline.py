@@ -154,16 +154,15 @@ def get_policy_context(
         k=k,
         embedding_model=embedding_model,
     )
-
     formatted_chunks: List[str] = []
     for doc in documents:
         source = doc.metadata.get("source", "Unknown Policy")
         page = doc.metadata.get("page")
-        page_label = f", page {page + 1}" if isinstance(page, int) else ""
+        page_label = f"Page {page + 1}" if isinstance(page, int) else ""
         content = " ".join(doc.page_content.split())
-        formatted_chunks.append(f"[Source: {source}{page_label}] {content}")
+        formatted_chunks.append(f"**Source: {source} ({page_label})**\n{content}")
 
-    return "\n\n".join(formatted_chunks)
+    return "\n\n---\n\n".join(formatted_chunks)
 
 
 def build_policy_query(
