@@ -3,6 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from langchain_core.documents import Document
+from pypdf import PdfReader
+
 
 DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 DEFAULT_CHUNK_SIZE = 1000
@@ -19,21 +22,28 @@ def _normalize_path(path: Optional[str | Path], fallback: Path) -> Path:
 
 
 def _load_pdf_documents(pdf_dir: Path) -> List[Any]:
-    from langchain_community.document_loaders import PyPDFLoader
-
     pdf_files = sorted(pdf_dir.glob("*.pdf"))
     if not pdf_files:
         raise FileNotFoundError(
             f"No PDF files found in {pdf_dir}. Add lending-policy PDFs before building the index."
         )
 
-    documents: List[Any] = []
+    documents: List[Document] = []
     for pdf_path in pdf_files:
-        loader = PyPDFLoader(str(pdf_path))
-        pages = loader.load()
-        for page in pages:
-            page.metadata["source"] = pdf_path.name
-        documents.extend(pages)
+        reader = PdfReader(str(pdf_path))
+        for page_number, page in enumerate(reader.pages):
+            content = (page.extract_text() or "").strip()
+            if not content:
+                continue
+            documents.append(
+                Document(
+                    page_content=content,
+                    metadata={"source": pdf_path.name, "page": page_number},
+                )
+            )
+
+    if not documents:
+        raise ValueError(f"No extractable text was found in PDF files under {pdf_dir}.")
 
     return documents
 
@@ -46,6 +56,41 @@ def _build_embeddings(model_name: str = DEFAULT_EMBEDDING_MODEL) -> Any:
         model_kwargs={"device": "cpu"},
         encode_kwargs={"normalize_embeddings": True},
     )
+
+
+def _split_documents(
+    documents: List[Document],
+    chunk_size: int,
+    chunk_overlap: int,
+) -> List[Document]:
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be positive.")
+    if chunk_overlap < 0:
+        raise ValueError("chunk_overlap cannot be negative.")
+    if chunk_overlap >= chunk_size:
+        raise ValueError("chunk_overlap must be smaller than chunk_size.")
+
+    chunks: List[Document] = []
+    step = chunk_size - chunk_overlap
+
+    for document in documents:
+        text = document.page_content.strip()
+        if not text:
+            continue
+
+        start = 0
+        while start < len(text):
+            end = min(len(text), start + chunk_size)
+            chunk_text = text[start:end].strip()
+            if chunk_text:
+                metadata = dict(document.metadata)
+                metadata["chunk_start"] = start
+                chunks.append(Document(page_content=chunk_text, metadata=metadata))
+            if end >= len(text):
+                break
+            start += step
+
+    return chunks
 
 
 def ingest_policy_documents(
@@ -63,16 +108,14 @@ def ingest_policy_documents(
     vector_index_dir.mkdir(parents=True, exist_ok=True)
 
     documents = _load_pdf_documents(source_dir)
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
     from langchain_community.vectorstores import FAISS
 
-    splitter = RecursiveCharacterTextSplitter(
+    embeddings = _build_embeddings(embedding_model)
+    chunks = _split_documents(
+        documents=documents,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
     )
-    chunks = splitter.split_documents(documents)
-
-    embeddings = _build_embeddings(embedding_model)
     vector_store = FAISS.from_documents(chunks, embeddings)
     vector_store.save_local(str(vector_index_dir))
     return vector_index_dir

@@ -9,7 +9,7 @@ joblib
 shap
 matplotlib
 seaborn
-langchain
+langgraph
 langchain-community
 langchain-core
 langchain-openai

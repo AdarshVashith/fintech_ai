@@ -2,19 +2,12 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 from langchain_core.messages import AIMessage, HumanMessage
 
 from src.model_inference import predict_risk_score
 from src.rag_pipeline import build_policy_query, get_policy_context
-
-
-def _borrower_profile_from_json(payload: str) -> Dict[str, Any]:
-    data = json.loads(payload)
-    if not isinstance(data, dict):
-        raise ValueError("Borrower payload must deserialize to a JSON object.")
-    return data
 
 
 def _format_policy_exception_guidance(policy_context: str) -> str:
@@ -91,11 +84,11 @@ def _build_fallback_verdict(
 class SimpleConversationBufferMemory:
     """
     Small local replacement for ConversationBufferMemory to avoid version-specific
-    LangChain memory import issues on deployment targets.
+    memory dependencies on deployment targets.
     """
 
     def __init__(self) -> None:
-        self.chat_history: list[Any] = []
+        self.chat_history: List[Any] = []
 
     def load_memory_variables(self, _: Dict[str, Any]) -> Dict[str, Any]:
         return {"chat_history": self.chat_history}
@@ -113,39 +106,127 @@ def _get_memory():
     return SimpleConversationBufferMemory()
 
 
-def build_lending_tools(
-    model: Optional[Any] = None,
-    model_name: Optional[str] = None,
-    model_path: Optional[str] = None,
-):
-    from langchain_core.tools import tool
+class LendingDecisionState(TypedDict, total=False):
+    borrower_profile: Dict[str, Any]
+    model: Optional[Any]
+    model_name: Optional[str]
+    model_path: Optional[str]
+    prediction: Dict[str, Any]
+    policy_query: str
+    policy_context: str
+    reasoning: str
+    decision_source: str
+    llm_error: str
 
-    @tool("predict_risk_score")
-    def predict_risk_score_tool(borrower_payload_json: str) -> str:
-        """
-        Run the trained credit-risk model on a borrower payload encoded as JSON.
-        """
-        borrower_profile = _borrower_profile_from_json(borrower_payload_json)
-        prediction = predict_risk_score(
-            borrower_profile=borrower_profile,
-            model=model,
-            model_name=model_name,
-            model_path=model_path,
+
+def _score_borrower_node(state: LendingDecisionState) -> LendingDecisionState:
+    borrower_profile = state["borrower_profile"]
+    prediction = predict_risk_score(
+        borrower_profile=borrower_profile,
+        model=state.get("model"),
+        model_name=state.get("model_name"),
+        model_path=state.get("model_path"),
+    )
+    policy_query = build_policy_query(
+        borrower_profile=borrower_profile,
+        risk_score=prediction["risk_score"],
+    )
+    return {
+        "prediction": prediction,
+        "policy_query": policy_query,
+        "policy_context": "",
+    }
+
+
+def _should_lookup_policy(state: LendingDecisionState) -> str:
+    prediction = state["prediction"]
+    return "policy_lookup" if prediction["risk_band"] == "High" else "draft_recommendation"
+
+
+def _policy_lookup_node(state: LendingDecisionState) -> LendingDecisionState:
+    try:
+        policy_context = get_policy_context(state["policy_query"])
+    except Exception as exc:
+        policy_context = f"Policy lookup unavailable: {exc}"
+    return {"policy_context": policy_context}
+
+
+def _draft_recommendation_node(state: LendingDecisionState) -> LendingDecisionState:
+    prediction = state["prediction"]
+    policy_context = _format_policy_exception_guidance(state.get("policy_context", ""))
+
+    try:
+        from langchain_core.prompts import ChatPromptTemplate
+
+        llm = _build_llm()
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    "You are an underwriting decision agent operating inside a LangGraph workflow. "
+                    "Use the scored borrower profile, risk factors, and policy context already provided. "
+                    "Return a concise but complete recommendation with these headings: "
+                    "`Final Lending Verdict`, `Risk Score`, `Reasoning`, and `Policy Citation Summary`. "
+                    "Do not claim to have used tools. Ground every claim in the provided inputs.",
+                ),
+                (
+                    "human",
+                    "Borrower profile:\n{borrower_profile}\n\n"
+                    "Model prediction:\n{prediction}\n\n"
+                    "Policy query:\n{policy_query}\n\n"
+                    "Policy context:\n{policy_context}",
+                ),
+            ]
         )
-        prediction["policy_query"] = build_policy_query(
-            borrower_profile=borrower_profile,
-            risk_score=prediction["risk_score"],
+        chain = prompt | llm
+        response = chain.invoke(
+            {
+                "borrower_profile": json.dumps(state["borrower_profile"], default=str, indent=2),
+                "prediction": json.dumps(prediction, default=str, indent=2),
+                "policy_query": state["policy_query"],
+                "policy_context": policy_context,
+            }
         )
-        return json.dumps(prediction, default=str)
+        reasoning = getattr(response, "content", str(response))
+        return {
+            "reasoning": reasoning,
+            "policy_context": policy_context,
+            "decision_source": "langgraph",
+        }
+    except Exception as exc:
+        fallback = _build_fallback_verdict(
+            borrower_profile=state["borrower_profile"],
+            prediction=prediction,
+            policy_context=policy_context,
+        )
+        return {
+            "reasoning": fallback["reasoning"],
+            "policy_context": fallback["policy_context"],
+            "decision_source": fallback["decision_source"],
+            "llm_error": str(exc),
+        }
 
-    @tool
-    def search_policy_docs(query: str) -> str:
-        """
-        Search lending-policy PDFs for rules, exceptions, mitigation guidance, and underwriting constraints.
-        """
-        return get_policy_context(query)
 
-    return [predict_risk_score_tool, search_policy_docs]
+def _build_lending_graph():
+    from langgraph.graph import END, START, StateGraph
+
+    graph = StateGraph(LendingDecisionState)
+    graph.add_node("score_borrower", _score_borrower_node)
+    graph.add_node("policy_lookup", _policy_lookup_node)
+    graph.add_node("draft_recommendation", _draft_recommendation_node)
+
+    graph.add_edge(START, "score_borrower")
+    graph.add_conditional_edges(
+        "score_borrower",
+        _should_lookup_policy,
+        {
+            "policy_lookup": "policy_lookup",
+            "draft_recommendation": "draft_recommendation",
+        },
+    )
+    graph.add_edge("policy_lookup", "draft_recommendation")
+    graph.add_edge("draft_recommendation", END)
+    return graph.compile()
 
 
 def answer_follow_up_question(
@@ -162,7 +243,10 @@ def answer_follow_up_question(
     chat_history = memory_variables.get("chat_history", [])
 
     policy_summary = lending_decision.get("policy_context", "No policy citations were retrieved.")
-    risk_factors = "\n".join(f"- {factor}" for factor in lending_decision.get("risk_factors", [])) or "- No extra risk factors recorded."
+    risk_factors = (
+        "\n".join(f"- {factor}" for factor in lending_decision.get("risk_factors", []))
+        or "- No extra risk factors recorded."
+    )
 
     try:
         from langchain_core.prompts import ChatPromptTemplate
@@ -223,76 +307,41 @@ def run_agentic_lending_decision(
     model_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Produce a final lending verdict using tool-based reasoning over ML outputs and policy retrieval.
+    Produce a final lending verdict using a LangGraph workflow over ML outputs and policy retrieval.
     """
-    prediction = predict_risk_score(
-        borrower_profile=borrower_profile,
-        model=model,
-        model_name=model_name,
-        model_path=model_path,
-    )
-    policy_query = build_policy_query(
-        borrower_profile=borrower_profile,
-        risk_score=prediction["risk_score"],
-    )
-
-    policy_context = ""
-    if prediction["risk_band"] == "High":
-        try:
-            policy_context = get_policy_context(policy_query)
-        except Exception as exc:
-            policy_context = f"Policy lookup unavailable: {exc}"
-
-    try:
-        from langchain.agents import AgentExecutor, create_tool_calling_agent
-        from langchain_core.prompts import ChatPromptTemplate
-
-        llm = _build_llm()
-        tools = build_lending_tools(
-            model=model,
-            model_name=model_name,
-            model_path=model_path,
-        )
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    "You are an underwriting decision agent. Always call `predict_risk_score` first. "
-                    "If the risk band is High, call `search_policy_docs` using the policy_query returned by the "
-                    "prediction tool to see whether mitigants or documented exceptions apply. "
-                    "Return a concise but complete lending recommendation that includes: "
-                    "1) Final Lending Verdict, 2) Risk Score, 3) Reasoning paragraph, "
-                    "4) Policy Citation Summary. Ground every claim in tool outputs.",
-                ),
-                (
-                    "human",
-                    "Assess this borrower and produce the final lending verdict.\nBorrower JSON:\n{borrower_payload}",
-                ),
-                ("placeholder", "{agent_scratchpad}"),
-            ]
-        )
-        agent = create_tool_calling_agent(llm, tools, prompt)
-        executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
-        result = executor.invoke({"borrower_payload": json.dumps(borrower_profile, default=str)})
-
-        return {
-            "final_verdict": "LLM Agent Recommendation",
-            "risk_band": prediction["risk_band"],
-            "risk_score": prediction["risk_score"],
-            "model_name": prediction["model_name"],
-            "reasoning": result["output"],
-            "risk_factors": prediction["risk_factors"],
-            "policy_query": policy_query,
-            "policy_context": _format_policy_exception_guidance(policy_context),
+    graph = _build_lending_graph()
+    final_state = graph.invoke(
+        {
             "borrower_profile": borrower_profile,
-            "decision_source": "llm_agent",
+            "model": model,
+            "model_name": model_name,
+            "model_path": model_path,
         }
-    except Exception:
+    )
+
+    prediction = final_state["prediction"]
+    policy_context = _format_policy_exception_guidance(final_state.get("policy_context", ""))
+    decision_source = final_state.get("decision_source", "langgraph")
+
+    if decision_source == "fallback":
         return {
             **_build_fallback_verdict(
                 borrower_profile=borrower_profile,
                 prediction=prediction,
-                policy_context=_format_policy_exception_guidance(policy_context),
+                policy_context=policy_context,
             ),
-            "policy_query": policy_query,
+            "policy_query": final_state["policy_query"],
         }
+
+    return {
+        "final_verdict": "LangGraph Recommendation",
+        "risk_band": prediction["risk_band"],
+        "risk_score": prediction["risk_score"],
+        "model_name": prediction["model_name"],
+        "reasoning": final_state["reasoning"],
+        "risk_factors": prediction["risk_factors"],
+        "policy_query": final_state["policy_query"],
+        "policy_context": policy_context,
+        "borrower_profile": borrower_profile,
+        "decision_source": decision_source,
+    }
