@@ -85,9 +85,12 @@ def load_policy_vector_store(
     from langchain_community.vectorstores import FAISS
 
     vector_index_dir = _normalize_path(index_dir, DEFAULT_INDEX_DIR)
-    if not vector_index_dir.exists():
+    index_file = vector_index_dir / "index.faiss"
+    
+    if not index_file.exists():
         raise FileNotFoundError(
-            f"Policy index not found at {vector_index_dir}. Run ingest_policy_documents() first."
+            f"Policy index file not found at {index_file}. "
+            f"Please ensure policy PDFs are in {DEFAULT_POLICY_DIR} and re-run ingestion."
         )
 
     embeddings = _build_embeddings(embedding_model)
@@ -109,18 +112,29 @@ def retrieve_policy_documents(
     Retrieve the most relevant policy chunks for a borrower risk scenario.
     """
     vector_index_dir = _normalize_path(index_dir, DEFAULT_INDEX_DIR)
-    if not vector_index_dir.exists():
-        ingest_policy_documents(
-            pdf_dir=pdf_dir,
+    index_file = vector_index_dir / "index.faiss"
+    
+    if not index_file.exists():
+        try:
+            ingest_policy_documents(
+                pdf_dir=pdf_dir,
+                index_dir=vector_index_dir,
+                embedding_model=embedding_model,
+            )
+        except Exception as e:
+            # If ingestion fails, we'll return an empty list rather than crashing
+            print(f"Auto-ingestion failed: {e}")
+            return []
+
+    try:
+        vector_store = load_policy_vector_store(
             index_dir=vector_index_dir,
             embedding_model=embedding_model,
         )
-
-    vector_store = load_policy_vector_store(
-        index_dir=vector_index_dir,
-        embedding_model=embedding_model,
-    )
-    return vector_store.similarity_search(query, k=k)
+        return vector_store.similarity_search(query, k=k)
+    except Exception as e:
+        print(f"Vector store search failed: {e}")
+        return []
 
 
 def get_policy_context(

@@ -19,3 +19,4 @@ sentence-transformers
 faiss-cpu
 pypdf
 reportlab
+python-dotenv

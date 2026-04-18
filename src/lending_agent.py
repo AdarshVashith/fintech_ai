@@ -4,6 +4,10 @@ import json
 import os
 from typing import Any, Dict, Optional
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from langchain_core.messages import AIMessage, HumanMessage
 
 from src.model_inference import predict_risk_score
@@ -30,19 +34,19 @@ def _build_llm():
         from langchain_groq import ChatGroq
 
         model_name = os.getenv("LENDING_AGENT_MODEL", "llama-3.3-70b-versatile")
-        return ChatGroq(model=model_name, temperature=0)
+        return ChatGroq(model=model_name, temperature=0.7)
 
     if provider in {"openai", ""} and os.getenv("OPENAI_API_KEY"):
         from langchain_openai import ChatOpenAI
 
         model_name = os.getenv("LENDING_AGENT_MODEL", "gpt-4o")
-        return ChatOpenAI(model=model_name, temperature=0)
+        return ChatOpenAI(model=model_name, temperature=0.7)
 
     if provider in {"anthropic", ""} and os.getenv("ANTHROPIC_API_KEY"):
         from langchain_anthropic import ChatAnthropic
 
         model_name = os.getenv("LENDING_AGENT_MODEL", "claude-3-5-sonnet-latest")
-        return ChatAnthropic(model=model_name, temperature=0)
+        return ChatAnthropic(model=model_name, temperature=0.7)
 
     raise RuntimeError(
         "No supported LLM provider is configured. Set GROQ_API_KEY, OPENAI_API_KEY, or "
