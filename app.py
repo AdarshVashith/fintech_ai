@@ -360,6 +360,7 @@ def reset_follow_up_state() -> None:
     st.session_state.conversation_memory = None
     st.session_state.agent_chat_history = []
     st.session_state.follow_up_question = ""
+    st.session_state.clear_follow_up_question = False
 
 
 inject_theme()
@@ -375,6 +376,12 @@ if "conversation_memory" not in st.session_state:
     st.session_state.conversation_memory = None
 if "follow_up_question" not in st.session_state:
     st.session_state.follow_up_question = ""
+if "clear_follow_up_question" not in st.session_state:
+    st.session_state.clear_follow_up_question = False
+
+if st.session_state.clear_follow_up_question:
+    st.session_state.follow_up_question = ""
+    st.session_state.clear_follow_up_question = False
 
 model_registry = load_model_registry()
 if not model_registry:
@@ -505,7 +512,7 @@ with agent_chat_col:
                     st.session_state.conversation_memory = follow_up_result["memory"]
                     st.session_state.agent_chat_history.append(("user", follow_up.strip()))
                     st.session_state.agent_chat_history.append(("assistant", follow_up_result["answer"]))
-                    st.session_state.follow_up_question = ""
+                    st.session_state.clear_follow_up_question = True
                     st.rerun()
                 else:
                     st.warning("Please enter a question before continuing.")
